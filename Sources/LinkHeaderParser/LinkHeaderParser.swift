@@ -139,7 +139,7 @@ public struct LinkHeaderParser {
 			guard scanner.scanString(">", into: nil) else {return nil}
 			let uriReference = currentParsedString! as String
 			
-			var rawAttributes = [String: [(originalKey: String, value: String)]]()
+			var rawAttributes = [String: [String]]()
 			finishedWithWhites = scanner.scanCharacters(from: spaceCharacterSet, into: nil)
 			while scanner.scanString(";", into: nil) {
 				scanner.scanCharacters(from: spaceCharacterSet, into: nil)
@@ -165,14 +165,14 @@ public struct LinkHeaderParser {
 					guard !value.isEmpty else {return nil}
 				}
 				
-				rawAttributes[key.lowercased(), default: []].append((originalKey: key, value: value))
+				rawAttributes[key.lowercased(), default: []].append(value)
 				
 				finishedWithWhites = scanner.scanCharacters(from: spaceCharacterSet, into: nil)
 			}
 			
 			/* The “rel” attribute is mandatory */
-			guard let relList = rawAttributes["rel"], let rawRel = relList.first?.value, (relList.count == 1 || lax) else {return nil}
-			let rev = rawAttributes["rev"]?.first?.value.split(separator: " ").map(String.init)
+			guard let relList = rawAttributes["rel"], let rawRel = relList.first, (relList.count == 1 || lax) else {return nil}
+			let rev = rawAttributes["rev"]?.first?.split(separator: " ").map(String.init)
 			let rel = rawRel.split(separator: " ").map(String.init)
 			guard !rel.isEmpty else {return nil}
 			/* In theory, we should validate the rel and rev values here…
@@ -185,7 +185,7 @@ public struct LinkHeaderParser {
 			 * particular, it DOES NOT STATE there must be at most one “anchor”
 			 * parameter in the attributes! */
 			let effectiveContext: URL?
-			if let anchorStr = rawAttributes["anchor"]?.first?.value {
+			if let anchorStr = rawAttributes["anchor"]?.first {
 				guard let context = URL(string: anchorStr, relativeTo: defaultContext) else {return nil}
 				effectiveContext = context
 			} else {
@@ -193,19 +193,19 @@ public struct LinkHeaderParser {
 			}
 			guard let link = URL(string: uriReference, relativeTo: effectiveContext) else {return nil}
 			
-			let hreflang = rawAttributes["hreflang"]?.map{ $0.value }
+			let hreflang = rawAttributes["hreflang"]
 			
 			let mediaList = rawAttributes["media"]
 			guard lax || (mediaList?.count ?? 0) <= 1 else {return nil}
-			let media = mediaList?.first?.value
+			let media = mediaList?.first
 			
 			let titleNoStarList = rawAttributes["title"]
 			guard lax || (titleNoStarList?.count ?? 0) <= 1 else {return nil}
-			let titleNoStar = titleNoStarList?.first?.value
+			let titleNoStar = titleNoStarList?.first
 			
 			let titleStarList = rawAttributes["title*"]
 			guard lax || (titleStarList?.count ?? 0) <= 1 else {return nil}
-			let titleStarUnparsed = titleStarList?.first?.value
+			let titleStarUnparsed = titleStarList?.first
 			#warning("TODO: Parse the title star")
 			let titleStar = titleStarUnparsed
 			
@@ -213,7 +213,7 @@ public struct LinkHeaderParser {
 			
 			let typeList = rawAttributes["title"]
 			guard lax || (typeList?.count ?? 0) <= 1 else {return nil}
-			let type = typeList?.first?.value
+			let type = typeList?.first
 			
 			for k in ["rel", "rev", "anchor", "hreflang", "media", "title", "title*", "type"] {
 				rawAttributes.removeValue(forKey: k)
@@ -222,8 +222,9 @@ public struct LinkHeaderParser {
 			#warning("TODO: Parse the star attributes")
 			
 			results.append(LinkValue(
-				link: link, context: effectiveContext, rel: rel, rev: rev, hreflang: hreflang, mediaQuery: media, title: title, type: type,
-				extensions: rawAttributes.mapValues{ $0.map{ $0.value } }
+				link: link, context: effectiveContext, rel: rel, rev: rev,
+				hreflang: hreflang, mediaQuery: media, title: title, type: type,
+				extensions: rawAttributes
 			))
 			
 			first = false
