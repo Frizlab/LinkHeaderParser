@@ -46,6 +46,8 @@ public struct LinkValue : Equatable {
 	public var hreflang: [String]?
 	/** The unparsed “media” value. To parse, use ABNF “media-query-list.” */
 	public var mediaQuery: String?
+	/** The “title” and/or “title*” attribute. Uses the “title*” if present and
+	decodable (only UTF-8 is supported), otherwise fallbacks on “title”. */
 	public var title: String?
 	/** The unparsed “type” value. To parse, use ABNF:
 	`type-name "/" subtype-name ; see Section 4.2 of [RFC6838]`. */
@@ -55,7 +57,11 @@ public struct LinkValue : Equatable {
 	link. Because rfc8828 states the names of the target attributes “MUST be
 	compared in a case-insensitive fashion,” all the keys in this dictionary are
 	lowercased. It has been a design choice not to give access to the original-
-	cased attribute names. */
+	cased attribute names.
+	
+	The “*” attributes are **not** parsed, but the `parseRFC8187EncodedString`
+	method exists in LinkHeaderParser to parse these kind of values (only UTF-8
+	is supported). */
 	public var extensions: [String: [String]]
 	
 }
@@ -64,25 +70,25 @@ public struct LinkValue : Equatable {
 /* https://www.rfc-editor.org/rfc/rfc8288.txt */
 public struct LinkHeaderParser {
 	
-	static func parseLinkHeaderFrom(request: URLRequest, response: HTTPURLResponse, lax: Bool = true) -> [LinkValue]? {
+	public static func parseLinkHeaderFrom(request: URLRequest, response: HTTPURLResponse, lax: Bool = true) -> [LinkValue]? {
 		guard let linkHeader = response.allHeaderFields["Link"] as? String else {return nil}
 		let context = contextFrom(requestURL: request.url, requestMethod: request.httpMethod, responseStatusCode: response.statusCode, contentLocationHeader: response.allHeaderFields["Content-Location"] as? String)
 		return parseLinkHeader(linkHeader, defaultContext: context, contentLanguageHeader: response.allHeaderFields["Content-Language"] as? String, lax: lax)
 	}
 	
-	static func parseLinkHeaders(_ linkHeaders: [String], requestURL: URL?, requestMethod: String?, responseStatusCode: Int?, contentLocationHeader: String?, contentLanguageHeader: String?, lax: Bool = true) -> [LinkValue]? {
+	public static func parseLinkHeaders(_ linkHeaders: [String], requestURL: URL?, requestMethod: String?, responseStatusCode: Int?, contentLocationHeader: String?, contentLanguageHeader: String?, lax: Bool = true) -> [LinkValue]? {
 		let context = contextFrom(requestURL: requestURL, requestMethod: requestMethod, responseStatusCode: responseStatusCode, contentLocationHeader: contentLocationHeader)
 		return parseLinkHeaders(linkHeaders, defaultContext: context, contentLanguageHeader: contentLanguageHeader, lax: lax)
 	}
 	
-	static func parseLinkHeaders(_ linkHeaders: [String], defaultContext: URL?, contentLanguageHeader: String?, lax: Bool = true) -> [LinkValue]? {
+	public static func parseLinkHeaders(_ linkHeaders: [String], defaultContext: URL?, contentLanguageHeader: String?, lax: Bool = true) -> [LinkValue]? {
 		return linkHeaders
 			.compactMap{ parseLinkHeader($0, defaultContext: defaultContext, contentLanguageHeader: contentLanguageHeader, lax: lax) }
 			.flatMap{ $0 }
 	}
 	
 	/* Don't forget “anonymous” context (in anchor parameter) */
-	static func parseLinkHeader(_ linkHeader: String, defaultContext: URL?, contentLanguageHeader: String?, lax: Bool = true) -> [LinkValue]? {
+	public static func parseLinkHeader(_ linkHeader: String, defaultContext: URL?, contentLanguageHeader: String?, lax: Bool = true) -> [LinkValue]? {
 		/* If we’re “lax” parsing, we trim whitespaces from the input. */
 		let linkHeader = (lax ? linkHeader.trimmingCharacters(in: spaceCharacterSet) : linkHeader)
 		
@@ -206,8 +212,7 @@ public struct LinkHeaderParser {
 			let titleStarList = rawAttributes["title*"]
 			guard lax || (titleStarList?.count ?? 0) <= 1 else {return nil}
 			let titleStarUnparsed = titleStarList?.first
-			#warning("TODO: Parse the title star")
-			let titleStar = titleStarUnparsed
+			let titleStar = titleStarUnparsed.flatMap{ parseRFC8187EncodedString($0, defaultLanguage: contentLanguageHeader)?.value }
 			
 			let title = titleStar ?? titleNoStar
 			
@@ -218,8 +223,6 @@ public struct LinkHeaderParser {
 			for k in ["rel", "rev", "anchor", "hreflang", "media", "title", "title*", "type"] {
 				rawAttributes.removeValue(forKey: k)
 			}
-			
-			#warning("TODO: Parse the star attributes")
 			
 			results.append(LinkValue(
 				link: link, context: effectiveContext, rel: rel, rev: rev,
@@ -237,6 +240,49 @@ public struct LinkHeaderParser {
 		guard lax || !finishedWithWhites else {return nil}
 		
 		return results
+	}
+	
+	/* RFC 8187
+	 * Only supports UTF-8 charset.
+	 * Language is not validated (returned as-is). */
+	public static func parseRFC8187EncodedString(_ string: String, defaultLanguage: String?) -> (charset: String, language: String?, value: String)? {
+		var currentParsedString: NSString?
+		let scanner = Scanner(string: string)
+		scanner.charactersToBeSkipped = CharacterSet()
+		
+		guard scanner.scanCharacters(from: mimeCharacterSet, into: &currentParsedString) else {return nil}
+		let charset = currentParsedString! as String
+		guard charset.uppercased() == "UTF-8" else {return nil} /* We only support UTF-8 */
+		
+		let language: String?
+		guard scanner.scanString("'", into: nil) else {return nil}
+		/* The language cannot contain a single-quote, so we simply parse the
+		 * language by reading the string up to the next single-quote. In theory
+		 * we should parse a Language-Tag (rfc5646, section 2.1). */
+		if scanner.scanUpTo("'", into: &currentParsedString) {language = currentParsedString! as String}
+		else                                                 {language = defaultLanguage}
+		guard scanner.scanString("'", into: nil) else {return nil}
+		
+		guard !scanner.isAtEnd else {
+			return (charset: charset, language: language, value: "")
+		}
+		
+		guard scanner.scanUpToCharacters(from: CharacterSet(), into: &currentParsedString) else {return nil}
+		let percentEncodedValue = currentParsedString! as String
+		/* Note: Theorically, we should validate percentEncodedValue. ABNF:
+		 *    value-chars   = *( pct-encoded / attr-char )
+		 *
+		 *    pct-encoded   = "%" HEXDIG HEXDIG
+		 *                  ; see [RFC3986], Section 2.1
+		 *
+		 *    attr-char     = ALPHA / DIGIT
+		 *                  / "!" / "#" / "$" / "&" / "+" / "-" / "."
+		 *                  / "^" / "_" / "`" / "|" / "~"
+		 *                  ; token except ( "*" / "'" / "%" )
+		 * (attr-char = attrCharacterSet) */
+		
+		guard let value = percentEncodedValue.removingPercentEncoding else {return nil}
+		return (charset: charset, language: language, value: value)
 	}
 	
 	private init() {}
@@ -294,7 +340,9 @@ public struct LinkHeaderParser {
 		return contentLocationHeader.flatMap{ URL(string: $0) }
 	}
 	
-	private static let tokenCharacterSet = CharacterSet(charactersIn: "!#$%&'*+-.^_`|~0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	private static let digitCharacterSet = CharacterSet(charactersIn: "0123456789")
+	private static let alphaCharacterSet = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	private static let tokenCharacterSet = CharacterSet(charactersIn: "!#$%&'*+-.^_`|~").union(digitCharacterSet).union(alphaCharacterSet)
 	private static let spaceCharacterSet = CharacterSet(charactersIn: " \t")
 	
 	private static let quotedTextCharacterSet = CharacterSet(charactersIn: "\t ")
@@ -305,5 +353,9 @@ public struct LinkHeaderParser {
 	private static let quotedPairSecondCharCharacterSet = CharacterSet(charactersIn: "\t ")
 		.union(CharacterSet(charactersIn: Unicode.Scalar(0x21)...Unicode.Scalar(0x7e)))
 		.union(CharacterSet(charactersIn: Unicode.Scalar(0x80)...Unicode.Scalar(0xff)))
+	
+	/* For RFC 8187 */
+	private static let mimeCharacterSet = CharacterSet(charactersIn: "!#$%&+-^_`{}~").union(digitCharacterSet).union(alphaCharacterSet)
+	private static let attrCharacterSet = CharacterSet(charactersIn: "!#$&+-.^_`|~").union(digitCharacterSet).union(alphaCharacterSet)
 	
 }

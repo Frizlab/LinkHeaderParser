@@ -36,7 +36,7 @@ final class LinkHeaderParserTests: XCTestCase {
 	
 	func testWeirdHeaderParse() {
 		let header = "<http://example.com/;;;,,,>; rel=\"next;;;,,, next\"; a-zA-Z0-9!#$&+-.^_|~=!#$%&'*+-.0-9a-zA-Z^_|~; title*=UTF-8'de'N%c3%a4chstes%20Kapitel"
-		let expectedLinkValue = LinkValue(link: URL(string: "http://example.com/;;;,,,")!, context: nil, rel: ["next;;;,,,", "next"], rev: nil, hreflang: nil, mediaQuery: nil, title: "Nächstes Kapitel", type: nil, extensions: ["a-zA-Z0-9!#$&+-.^_|~": ["!#$%&'*+-./0-9:<=>?@a-zA-Z^_|~"]])
+		let expectedLinkValue = LinkValue(link: URL(string: "http://example.com/;;;,,,")!, context: nil, rel: ["next;;;,,,", "next"], rev: nil, hreflang: nil, mediaQuery: nil, title: "Nächstes Kapitel", type: nil, extensions: ["a-za-z0-9!#$&+-.^_|~": ["!#$%&'*+-.0-9a-zA-Z^_|~"]])
 		XCTAssertEqual(LinkHeaderParser.parseLinkHeader(header, defaultContext: nil, contentLanguageHeader: nil, lax: true), [expectedLinkValue])
 	}
 	
