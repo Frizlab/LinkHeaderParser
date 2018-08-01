@@ -40,9 +40,22 @@ final class LinkHeaderParserTests: XCTestCase {
 		XCTAssertEqual(LinkHeaderParser.parseLinkHeader(header, defaultContext: nil, contentLanguageHeader: nil, lax: true), [expectedLinkValue])
 	}
 	
+	func testInvalidLinkLaxParsing() {
+		let header = "<https://api.github.com/users?per_page=21&since=31>; rel=\"next\", <https://api.github.com/users{?since}>; rel=\"first\""
+		let expectedLinkValues = [LinkValue(link: URL(string: "https://api.github.com/users?per_page=21&since=31")!, context: nil, rel: ["next"], rev: nil, hreflang: nil, mediaQuery: nil, title: nil, type: nil, extensions: [:])]
+		XCTAssertEqual(LinkHeaderParser.parseLinkHeader(header, defaultContext: nil, contentLanguageHeader: nil, lax: true), expectedLinkValues)
+	}
+	
+	func testInvalidLinkStrictParsing() {
+		let header = "<https://api.github.com/users?per_page=21&since=31>; rel=\"next\", <https://api.github.com/users{?since}>; rel=\"first\""
+		XCTAssertEqual(LinkHeaderParser.parseLinkHeader(header, defaultContext: nil, contentLanguageHeader: nil, lax: false), nil)
+	}
+	
 	static var allTests = [
 		("testBasicHeaderParse", testBasicHeaderParse),
-		("testWeirdHeaderParse", testWeirdHeaderParse)
+		("testWeirdHeaderParse", testWeirdHeaderParse),
+		("testInvalidLinkLaxParsing", testInvalidLinkLaxParsing),
+		("testInvalidLinkStrictParsing", testInvalidLinkStrictParsing)
 	]
 	
 }

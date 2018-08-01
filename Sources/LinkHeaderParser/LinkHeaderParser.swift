@@ -87,7 +87,13 @@ public struct LinkHeaderParser {
 			.flatMap{ $0 }
 	}
 	
-	/* Don't forget “anonymous” context (in anchor parameter) */
+	/* In lax mode, any invalid link value (whether from the anchor or from the
+	 * <> part) will be skipped.
+	 * A previous version of this method just returned nil whenever it
+	 * encountered an invalid link. However, at the time of writing (2018-08-01),
+	 * GitHub returns invalid links in some of their “Link” headers. To make
+	 * life easier for people using this library for parsing GitHub’s “Link”
+	 * headers, we simply skip invalid links… */
 	public static func parseLinkHeader(_ linkHeader: String, defaultContext: URL?, contentLanguageHeader: String?, lax: Bool = true) -> [LinkValue]? {
 		/* If we’re “lax” parsing, we trim whitespaces from the input. */
 		let linkHeader = (lax ? linkHeader.trimmingCharacters(in: spaceCharacterSet) : linkHeader)
@@ -192,12 +198,18 @@ public struct LinkHeaderParser {
 			 * parameter in the attributes! */
 			let effectiveContext: URL?
 			if let anchorStr = rawAttributes["anchor"]?.first {
-				guard let context = URL(string: anchorStr, relativeTo: defaultContext) else {return nil}
+				guard let context = URL(string: anchorStr, relativeTo: defaultContext) else {
+					if lax {continue}
+					else   {return nil}
+				}
 				effectiveContext = context
 			} else {
 				effectiveContext = defaultContext
 			}
-			guard let link = URL(string: uriReference, relativeTo: effectiveContext) else {return nil}
+			guard let link = URL(string: uriReference, relativeTo: effectiveContext) else {
+				if lax {continue}
+				else   {return nil}
+			}
 			
 			let hreflang = rawAttributes["hreflang"]
 			
