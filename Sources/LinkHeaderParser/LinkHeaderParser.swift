@@ -340,12 +340,12 @@ public struct LinkHeaderParser {
 	private static let tokenCharacterSet = CharacterSet(charactersIn: "!#$%&'*+-.^_`|~").union(digitCharacterSet).union(alphaCharacterSet)
 	private static let spaceCharacterSet = CharacterSet(charactersIn: " \t")
 	
-	private static let quotedTextCharacterSet = CharacterSet(charactersIn: "\t ")
+	private static let quotedTextCharacterSet = spaceCharacterSet
 		.union(CharacterSet(arrayLiteral: Unicode.Scalar(0x21)))
 		.union(CharacterSet(charactersIn: Unicode.Scalar(0x23)...Unicode.Scalar(0x5b)))
 		.union(CharacterSet(charactersIn: Unicode.Scalar(0x5d)...Unicode.Scalar(0x7e)))
 		.union(CharacterSet(charactersIn: Unicode.Scalar(0x80)...Unicode.Scalar(0xff)))
-	private static let quotedPairSecondCharCharacterSet = CharacterSet(charactersIn: "\t ")
+	private static let quotedPairSecondCharCharacterSet = spaceCharacterSet
 		.union(CharacterSet(charactersIn: Unicode.Scalar(0x21)...Unicode.Scalar(0x7e)))
 		.union(CharacterSet(charactersIn: Unicode.Scalar(0x80)...Unicode.Scalar(0xff)))
 	
