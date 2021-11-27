@@ -89,7 +89,13 @@ public struct LinkHeaderParser {
 	/* In lax mode, any invalid link value (whether from the anchor or from the <> part) will be skipped.
 	 * A previous version of this method just returned nil whenever it encountered an invalid link.
 	 * However, at the time of writing (2018-08-01), GitHub returns invalid links in some of their “Link” headers.
-	 * To make life easier for people using this library for parsing GitHub’s “Link” headers, we simply skip invalid links… */
+	 * To make life easier for people using this library for parsing GitHub’s “Link” headers, we simply skip invalid links…
+	 *
+	 * We do NOT support obs-text in link values.
+	 * The rationale for this is we parse the header from the String type, which uses an UTF-8 view of the header, with grapheme clusters.
+	 * We do not have access to the raw data, and thus cannot check 0x80-0xff bytes.
+	 * One solution would be to convert the string to its original encoding, but we cannot be 100% it’s ISO-latin-1 (though it probably is),
+	 * and we’d have to assume reverse encoding conversion would indeed give the actual original bytes. */
 	public static func parseLinkHeader(_ linkHeader: String, defaultContext: URL?, contentLanguageHeader: String?, lax: Bool = true) -> [LinkValue]? {
 		/* If we’re “lax” parsing, we trim whitespaces from the input. */
 		let linkHeader = (lax ? linkHeader.trimmingCharacters(in: spaceCharacterSet) : linkHeader)
@@ -344,10 +350,8 @@ public struct LinkHeaderParser {
 		.union(CharacterSet(arrayLiteral: Unicode.Scalar(0x21)))
 		.union(CharacterSet(charactersIn: Unicode.Scalar(0x23)...Unicode.Scalar(0x5b)))
 		.union(CharacterSet(charactersIn: Unicode.Scalar(0x5d)...Unicode.Scalar(0x7e)))
-		.union(CharacterSet(charactersIn: Unicode.Scalar(0x80)...Unicode.Scalar(0xff))); #warning("TODO: This is wrong. Very wrong.")
 	private static let quotedPairSecondCharCharacterSet = spaceCharacterSet
 		.union(CharacterSet(charactersIn: Unicode.Scalar(0x21)...Unicode.Scalar(0x7e)))
-		.union(CharacterSet(charactersIn: Unicode.Scalar(0x80)...Unicode.Scalar(0xff))); #warning("TODO: This is wrong. Very wrong.")
 	
 	/* For RFC 8187 */
 	private static let mimeCharacterSet = CharacterSet(charactersIn: "!#$%&+-^_`{}~").union(digitCharacterSet).union(alphaCharacterSet)
