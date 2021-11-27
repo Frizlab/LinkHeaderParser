@@ -51,11 +51,26 @@ final class LinkHeaderParserTests: XCTestCase {
 		XCTAssertEqual(LinkHeaderParser.parseLinkHeader(header, defaultContext: nil, contentLanguageHeader: nil, lax: false), nil)
 	}
 	
+	func testBWSParse() {
+		let header = #"<https://apple.com/>; rel = about"#
+		let expectedLinkValue = LinkValue(link: URL(string: "https://apple.com/")!, context: nil, rel: ["about"], rev: nil, hreflang: nil, mediaQuery: nil, title: nil, type: nil, extensions: [:])
+		XCTAssertEqual(LinkHeaderParser.parseLinkHeader(header, defaultContext: nil, contentLanguageHeader: nil, lax: false), nil)
+		XCTAssertEqual(LinkHeaderParser.parseLinkHeader(header, defaultContext: nil, contentLanguageHeader: nil, lax: true), [expectedLinkValue])
+	}
+	
+	func testNoRelValueParse() {
+		let header = #"<https://apple.com/>; rel=me; test"# /* ABNF says the “=value” part is optional. It does not say what the value should be when it is not defined, but we can assume it is an empty string. */
+		let expectedLinkValue = LinkValue(link: URL(string: "https://apple.com/")!, context: nil, rel: ["me"], rev: nil, hreflang: nil, mediaQuery: nil, title: nil, type: nil, extensions: ["test": [""]])
+		XCTAssertEqual(LinkHeaderParser.parseLinkHeader(header, defaultContext: nil, contentLanguageHeader: nil, lax: true), [expectedLinkValue])
+	}
+	
 	static var allTests = [
 		("testBasicHeaderParse", testBasicHeaderParse),
 		("testWeirdHeaderParse", testWeirdHeaderParse),
 		("testInvalidLinkLaxParsing", testInvalidLinkLaxParsing),
-		("testInvalidLinkStrictParsing", testInvalidLinkStrictParsing)
+		("testInvalidLinkStrictParsing", testInvalidLinkStrictParsing),
+		("testBWSParse", testBWSParse),
+		("testNoRelValueParse", testNoRelValueParse)
 	]
 	
 }
