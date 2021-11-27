@@ -161,7 +161,12 @@ public struct LinkHeaderParser {
 				
 				/* There shouldn’t be any spaces after the key, but we allow it in lax mode (the RFC says there might be “bad” spaces). */
 				if lax {scanner.scanCharacters(from: spaceCharacterSet, into: nil)}
-				guard scanner.scanString("=", into: nil) else {return nil}
+				guard scanner.scanString("=", into: nil) else {
+					/* ABNF says the “=value” part is optional.
+					 * It does not say what the value should be when it is not defined, but we can assume it is an empty string. */
+					rawAttributes[key.lowercased(), default: []].append("")
+					continue
+				}
 				if lax {scanner.scanCharacters(from: spaceCharacterSet, into: nil)}
 				
 				let value: String
