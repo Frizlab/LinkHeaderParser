@@ -59,9 +59,9 @@ final class LinkHeaderParserTests: XCTestCase {
 	}
 	
 	func testNoRelValueParse() {
-		let header = #"<https://apple.com/>; rel=me; test"#
-		let expectedLinkValue = LinkValue(link: URL(string: "https://apple.com/")!, context: nil, rel: ["me"], rev: nil, hreflang: nil, mediaQuery: nil, title: nil, type: nil, extensions: ["test": [""]])
-		XCTAssertEqual(LinkHeaderParser.parseLinkHeader(header, defaultContext: nil, contentLanguageHeader: nil, lax: true), [expectedLinkValue])
+		let header = #"<https://apple.com/>; rel=me; test; test=42"#
+		let expectedLinkValue = LinkValue(link: URL(string: "https://apple.com/")!, context: nil, rel: ["me"], rev: nil, hreflang: nil, mediaQuery: nil, title: nil, type: nil, extensions: ["test": ["", "42"]])
+		XCTAssertEqual(LinkHeaderParser.parseLinkHeader(header, defaultContext: nil, contentLanguageHeader: nil, lax: false), [expectedLinkValue])
 	}
 	
 	static var allTests = [
