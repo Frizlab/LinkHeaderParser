@@ -56,11 +56,11 @@ public struct LinkValue : Equatable {
 	/**
 	 The target attributes extensions (non-listed in rfc8828) for the given link.
 	 Because rfc8828 states the names of the target attributes “MUST be compared in a case-insensitive fashion,”
-	 all the keys in this dictionary are lowercased.
+	  all the keys in this dictionary are lowercased.
 	 It has been a design choice not to give access to the original-cased attribute names.
 	 
 	 The `*` attributes are **not** parsed,
-	 but the `parseRFC8187EncodedString` method exists in LinkHeaderParser to parse these kind of values (only UTF-8 is supported). */
+	  but the `parseRFC8187EncodedString` method exists in LinkHeaderParser to parse these kind of values (only UTF-8 is supported). */
 	public var extensions: [String: [String]]
 	
 }
@@ -89,13 +89,13 @@ public struct LinkHeaderParser {
 	/* In lax mode, any invalid link value (whether from the anchor or from the <> part) will be skipped.
 	 * A previous version of this method just returned nil whenever it encountered an invalid link.
 	 * However, at the time of writing (2018-08-01), GitHub returns invalid links in some of their “Link” headers.
-	 * To make life easier for people using this library for parsing GitHub’s “Link” headers, we simply skip invalid links…
+	 * To make life easier for people using this library for parsing GitHub’s “Link” headers, we simply skip invalid links…
 	 *
 	 * We do NOT support obs-text in link values.
 	 * The rationale for this is we parse the header from the String type, which uses an UTF-8 view of the header, with grapheme clusters.
 	 * We do not have access to the raw data, and thus cannot check 0x80-0xff bytes.
 	 * One solution would be to convert the string to its original encoding, but we cannot be 100% it’s ISO-latin-1 (though it probably is),
-	 * and we’d have to assume reverse encoding conversion would indeed give the actual original bytes. */
+	 *  and we’d have to assume reverse encoding conversion would indeed give the actual original bytes. */
 	public static func parseLinkHeader(_ linkHeader: String, defaultContext: URL?, contentLanguageHeader: String?, lax: Bool = true) -> [LinkValue]? {
 		/* If we’re “lax” parsing, we trim whitespaces from the input. */
 		let linkHeader = (lax ? linkHeader.trimmingCharacters(in: spaceCharacterSet) : linkHeader)
@@ -124,7 +124,7 @@ public struct LinkHeaderParser {
 			 *
 			 * In our case, we must parse a “#element”.
 			 * If we’re lax we use the relaxed definition, otherwise we use the more restrictive one
-			 * (can be used to validate a sender sends valid data for instance).
+			 *  (can be used to validate a sender sends valid data for instance).
 			 * Note: I’m not 100% the relaxed definition of “#element” does not contain an error.
 			 *       If the string starts with a comma, according to the definition it would be required to be followed by some optional spaces, then another comma…
 			 *       Our parser does not have this limitation. */
@@ -133,7 +133,7 @@ public struct LinkHeaderParser {
 				foundComma = scanner.scanString(",", into: nil)
 				scanner.scanCharacters(from: spaceCharacterSet, into: nil)
 				if lax {
-					/* Let’s consume all the commas we can find */
+					/* Let’s consume all the commas we can find. */
 					while scanner.scanString(",", into: nil) {
 						scanner.scanCharacters(from: spaceCharacterSet, into: nil)
 					}
@@ -146,7 +146,7 @@ public struct LinkHeaderParser {
 			if lax && scanner.isAtEnd {break}
 			
 			guard scanner.scanString("<", into: nil) else {return nil}
-			guard scanner.scanUpTo(">", into: &currentParsedString) else {return nil} /* ">" in a URI-Reference is forbidden (rfc3986) */
+			guard scanner.scanUpTo(">", into: &currentParsedString) else {return nil} /* ">" in a URI-Reference is forbidden (rfc3986). */
 			guard scanner.scanString(">", into: nil) else {return nil}
 			let uriReference = currentParsedString! as String
 			
@@ -248,8 +248,7 @@ public struct LinkHeaderParser {
 		} while !scanner.isAtEnd
 		assert(scanner.isAtEnd)
 		
-		/* Note: It should be impossible to have lax parsing and have the finishedWithWhites variable to be true here
-		 *       because we trim whitespaces when lax parsing… */
+		/* Note: It should be impossible to have lax parsing and have the finishedWithWhites variable to be true here because we trim whitespaces when lax parsing… */
 		guard lax || !finishedWithWhites else {return nil}
 		
 		return results
@@ -281,7 +280,8 @@ public struct LinkHeaderParser {
 		
 		guard scanner.scanUpToCharacters(from: CharacterSet(), into: &currentParsedString) else {return nil}
 		let percentEncodedValue = currentParsedString! as String
-		/* Note: Theorically, we should validate percentEncodedValue. ABNF:
+		/* Note: Theorically, we should validate percentEncodedValue.
+		 * ABNF:
 		 *    value-chars   = *( pct-encoded / attr-char )
 		 *
 		 *    pct-encoded   = "%" HEXDIG HEXDIG
@@ -310,8 +310,11 @@ public struct LinkHeaderParser {
 		}
 		
 		/* Now let’s see if we stopped at a backlash.
-		 * If so, we’ll retrieve the next char, verify it is in the legal charset for a backslashed char,
-		 * add it to the parsed string, and continue parsing the quoted string from there. */
+		 * If so,
+		 *  we’ll retrieve the next char,
+		 *  verify it is in the legal charset for a backslashed char,
+		 *  add it to the parsed string,
+		 *  and continue parsing the quoted string from there. */
 		guard !scanner.scanString("\\", into: nil) else {
 			guard !scanner.isAtEnd else {return nil}
 			
@@ -341,8 +344,8 @@ public struct LinkHeaderParser {
 			return requestURL
 		}
 		
-		/* Note: If the Content-Location header contains a different value than the request URL,
-		 *       we _assume_ the context is the one given by the header, but we implement no means of verifying such a claim (see rfc7231, § 3.1.4.1). */
+		/* Note: If the Content-Location header contains a different value than the request URL, we _assume_ the context is the one given by the header,
+		 *        but we implement no means of verifying such a claim (see rfc7231, § 3.1.4.1). */
 		return contentLocationHeader.flatMap{ URL(string: $0) }
 	}
 	
@@ -358,7 +361,7 @@ public struct LinkHeaderParser {
 	private static let quotedPairSecondCharCharacterSet = spaceCharacterSet
 		.union(CharacterSet(charactersIn: Unicode.Scalar(0x21)...Unicode.Scalar(0x7e)))
 	
-	/* For RFC 8187 */
+	/* For RFC 8187. */
 	private static let mimeCharacterSet = CharacterSet(charactersIn: "!#$%&+-^_`{}~").union(digitCharacterSet).union(alphaCharacterSet)
 	private static let attrCharacterSet = CharacterSet(charactersIn: "!#$&+-.^_`|~").union(digitCharacterSet).union(alphaCharacterSet)
 	
